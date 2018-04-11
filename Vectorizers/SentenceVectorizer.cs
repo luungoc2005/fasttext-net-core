@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 
 namespace BotBotNLP.Vectorizers
 {
@@ -28,6 +28,7 @@ namespace BotBotNLP.Vectorizers
         .ToArray();
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private UInt64 CalculateHash(string input) {
       UInt64 hashedValue = 3074457345618258791ul;
       for(int i=0; i < input.Length; i++)

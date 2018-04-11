@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace BotBotNLP.Vectorizers
 {
@@ -25,6 +26,7 @@ namespace BotBotNLP.Vectorizers
       };
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public double[] GetWordVector(string word)
     {
       var idx = Array.BinarySearch(this.wordsDictionary, word.Trim().ToLowerInvariant());
@@ -63,10 +65,15 @@ namespace BotBotNLP.Vectorizers
               }
 
               this.wordsDictionary[idx] = tmp[0].ToLowerInvariant();
-              this.embeddingVector[idx] = tmp
-                  .Skip(1)
-                  .Select(element => double.Parse(element, CultureInfo.InvariantCulture.NumberFormat))
-                  .ToArray();
+              // LINQ version
+              // this.embeddingVector[idx] = tmp
+              //     .Skip(1)
+              //     .Select(element => double.Parse(element, CultureInfo.InvariantCulture.NumberFormat))
+              //     .ToArray();
+              this.embeddingVector[idx] = new double[this.EmbeddingDim];
+              for (var i = 1; i < tmp.Length; i++) {
+                this.embeddingVector[idx][i - 1] = double.Parse(tmp[i], CultureInfo.InvariantCulture.NumberFormat);
+              }
               
               idx += 1;
               if (idx >= this.MaxWords)
