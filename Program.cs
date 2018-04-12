@@ -15,54 +15,67 @@ namespace BotBotNLP
             var glovePath = Path.Combine(Directory.GetCurrentDirectory(), "data/glove.6B.300d.txt");
             var stopwatch = new Stopwatch();
 
-            double[][] trainData = null;
-            double[][] testData = null;
-            MakeTrainTest(Iris.Dataset(), out trainData, out testData);
+            // double[][] trainData = null;
+            // double[][] testData = null;
+            // MakeTrainTest(Iris.Dataset(), out trainData, out testData);
 
             stopwatch.Start();
             
             const int numInput = 4;
             const int numHidden = 7;
             const int numOutput = 3;
-            var nn = new LinearNetwork(numInput, numHidden, numOutput);
-            nn.InitializeWeights();
+            var nn = new SparseNetwork(numInput, numHidden, numOutput);
+            // nn.InitializeWeights();
             // Console.WriteLine(nn.ToString());
 
-            var maxEpochs = 50;
+            var maxEpochs = 15;
             double learnRate = 0.02;
 
+            var trainData = Iris.SparseDataset();
             nn.Train(trainData, maxEpochs, learnRate);
-
-            stopwatch.Stop();
-            Console.WriteLine("Task finished in {0} ms", stopwatch.ElapsedMilliseconds);
 
             var trainAcc = nn.Accuracy(trainData);
             Console.WriteLine("\nAccuracy on training data = " + trainAcc.ToString("F4"));
 
-            var testAcc = nn.Accuracy(testData);
-            Console.WriteLine("\nAccuracy on test data = " + testAcc.ToString("F4"));
+            // var testAcc = nn.Accuracy(testData);
+            // Console.WriteLine("\nAccuracy on test data = " + testAcc.ToString("F4"));
             
-            Console.WriteLine(nn.ToString());
-            // Console.WriteLine("Loading GLoVE vectors from {0}", glovePath);
-            // stopwatch.Start();
-            // var reader = new WordVectorReader(glovePath);
-            // stopwatch.Stop();
+            // Console.WriteLine(nn.ToString());
 
-            // var vectorizer = new SentenceVectorizer(reader);
+            // var test = new NeuralNetwork.Sparse.SparseMatrix<double>(10000000, 10000000);
+            // test[2, 4] = 1d;
+            // test[10000, 20] = 2d;
+            // test[10000, 30] = 4d;
+            // test[5000000, 5000000] = Math.PI;
+            // Console.WriteLine(test[2, 4]);
+            // Console.WriteLine(test[10000, 20]);
+            // Console.WriteLine(test[10000, 30]);
+            // Console.WriteLine(test[5000000, 5000000]);
+            // Console.WriteLine(test[10, 20]);
+            
+            stopwatch.Stop();
+            Console.WriteLine("Task finished in {0} ms", stopwatch.ElapsedMilliseconds);
 
-            // while (true) {
-            //     Console.Write("Word for inference: ");
-            //     var sentence = Console.ReadLine();
+            Console.WriteLine("Loading GLoVE vectors from {0}", glovePath);
+            stopwatch.Start();
+            var reader = new WordVectorReader(glovePath);
+            stopwatch.Stop();
 
-            //     if (sentence == "exit") break;
+            var vectorizer = new SentenceVectorizer(reader);
 
-            //     stopwatch.Restart();
-            //     var sent_vector = vectorizer.SentenceToVector(sentence, false);
-            //     stopwatch.Stop();
+            while (true) {
+                Console.Write("Word for inference: ");
+                var sentence = Console.ReadLine();
 
-            //     Console.WriteLine("Result: {0}", String.Join(",", sent_vector.Take(100)));
-            //     Console.WriteLine("Inference time: {0}", stopwatch.ElapsedMilliseconds);
-            // }
+                if (sentence == "exit") break;
+
+                stopwatch.Restart();
+                var sent_vector = vectorizer.SentenceToVector(sentence, false);
+                stopwatch.Stop();
+
+                Console.WriteLine("Result: {0}", String.Join(",", sent_vector.Values.Take(100)));
+                Console.WriteLine("Inference time: {0}", stopwatch.ElapsedMilliseconds);
+            }
         }
 
 

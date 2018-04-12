@@ -214,12 +214,13 @@ namespace BotBotNLP.NeuralNetwork
       }
     }
 
+    private const double TwoPI = 2d * Math.PI;
     private double NextGaussian(double mean, double stdDev) {
-      var u1 = 1.0-rnd.NextDouble(); //uniform(0,1] random doubles
-      var u2 = 1.0-rnd.NextDouble();
-      var randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
+      var u1 = 1d - rnd.NextDouble(); //uniform(0,1] random doubles
+      var u2 = 1d - rnd.NextDouble();
+      var randStdNormal = Math.Sqrt(-2d * Math.Log(u1)) * Math.Sin(TwoPI * u2); //random normal(0,1)
       return mean + stdDev * randStdNormal;
-    } 
+    }
 
     public double[] GetWeights()
     {
@@ -240,6 +241,7 @@ namespace BotBotNLP.NeuralNetwork
       return result;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private double[] ComputeOutputs(double[] xValues)
     {
       if (xValues.Length != numInput)
@@ -275,6 +277,7 @@ namespace BotBotNLP.NeuralNetwork
       return softOut;
     } // ComputeOutputs
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double HyperTanFunction(double x)
     {
       if (x < -20.0) return -1.0; // approximation is correct to 30 decimals
@@ -282,11 +285,13 @@ namespace BotBotNLP.NeuralNetwork
       else return Math.Tanh(x);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ReLUFunction(double x) 
     {
       return Math.Max(0, x);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double[] Softmax(double[] oSums) 
     {
       // does all output nodes at once so scale doesn't have to be re-computed each time
@@ -312,6 +317,7 @@ namespace BotBotNLP.NeuralNetwork
       return result; // now scaled so that xi sum to 1.0
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void UpdateWeights(double[] tValues, int epoch, double learnRate)
     {
       // update the weights and biases using back-propagation, with target values, eta (learning rate),
@@ -433,6 +439,7 @@ namespace BotBotNLP.NeuralNetwork
       }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Train(double[][] trainData, int maxEprochs, double learnRate)
     {
       // train a back-prop style NN classifier using learning rate and momentum
@@ -441,9 +448,7 @@ namespace BotBotNLP.NeuralNetwork
       var xValues = new double[numInput]; // inputs
       var tValues = new double[numOutput]; // target values
 
-      var sequence = new int[trainData.Length];
-      for (var i = 0; i < sequence.Length; ++i)
-        sequence[i] = i;
+      var sequence = Enumerable.Range(0, trainData.Length).ToArray();
 
       var lossHistory = new List<double>();
 

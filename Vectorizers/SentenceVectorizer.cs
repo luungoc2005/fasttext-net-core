@@ -7,14 +7,15 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
+using BotBotNLP.NeuralNetwork.Sparse;
 
 namespace BotBotNLP.Vectorizers
 {
   class SentenceVectorizer {
-    public UInt64 HashingBins {get; private set;}
+    public int HashingBins {get; private set;}
     public IWordVectorReader WordVectorReader {get; set;}
     
-    public SentenceVectorizer(IWordVectorReader wordVectorReader, UInt64 hashingBins = 10000000) {
+    public SentenceVectorizer(IWordVectorReader wordVectorReader, int hashingBins = 10000000) {
       this.WordVectorReader = wordVectorReader;
       this.HashingBins = hashingBins;
     }
@@ -49,7 +50,7 @@ namespace BotBotNLP.Vectorizers
       return bigrams.ToArray();
     }
 
-    public double[] SentenceToVector(string sentence, bool useHashingTrick = true) {
+    public SparseVector<double> SentenceToVector(string sentence, bool useHashingTrick = true) {
       var words = this.SentenceToWords(sentence.Trim().ToLowerInvariant());
       if (words.Length == 0) {
         return null;
@@ -71,21 +72,23 @@ namespace BotBotNLP.Vectorizers
         }
         
         if (!useHashingTrick) {
-          return wordvec_embeds;
+          var result = new SparseVector<double>(this.WordVectorReader.EmbeddingDim);
+          SparseVector<double>.Copy(wordvec_embeds, result);
+          return result;
         }
         else {
-          var wordvec_dim = (UInt64)this.WordVectorReader.EmbeddingDim;
+          var wordvec_dim = this.WordVectorReader.EmbeddingDim;
           var embeddingDim =  wordvec_dim + this.HashingBins;
           
-          var embeds = new double[embeddingDim];
-          Array.Copy(wordvec_embeds, embeds, this.WordVectorReader.EmbeddingDim);
+          var embeds = new SparseVector<double>(embeddingDim);
+          SparseVector<double>.Copy(wordvec_embeds, embeds, this.WordVectorReader.EmbeddingDim);
 
           if (words.Length > 2) {
             var bigrams = this.GetBiGramList(words);
             Parallel.ForEach(bigrams, bigram => {
               var hash = this.CalculateHash(bigram);
-              var hash_loc = hash % (this.HashingBins - 1) + 1;
-              embeds[wordvec_dim + hash_loc] = 1;
+              var hash_loc = hash % ((UInt64)this.HashingBins - 1) + 1;
+              embeds[(int)((UInt64)wordvec_dim + hash_loc)] = 1;
             });
           }
 

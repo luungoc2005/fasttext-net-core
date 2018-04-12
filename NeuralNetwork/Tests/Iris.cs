@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Linq;
+using BotBotNLP.NeuralNetwork.Sparse;
 
 namespace BotBotNLP.NeuralNetwork.Tests
 {
@@ -191,6 +192,17 @@ namespace BotBotNLP.NeuralNetwork.Tests
       for (var i = 0; i < data.Length; i++) {
         result[i] = new double[4];
         Array.Copy(data[i], 4, result[i], 0, 3);
+      }
+      return result;
+    }
+
+    public static SparseMatrix<double> SparseDataset() {
+      var data = Dataset();
+      var result = new SparseMatrix<double>(data.Length, data[0].Length);
+      for (var row = 0; row < data.Length; row++) {
+        for (var col = 0; col < data[0].Length; col++) {
+          result[row, col] = data[row][col];
+        }
       }
       return result;
     }
