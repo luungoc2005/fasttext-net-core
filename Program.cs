@@ -13,29 +13,46 @@ namespace BotBotNLP
         static void Main(string[] args)
         {
             var glovePath = Path.Combine(Directory.GetCurrentDirectory(), "data/glove.6B.300d.txt");
+            var dataPath = Path.Combine(Directory.GetCurrentDirectory(), "data/kc_data.json");
+            
             var stopwatch = new Stopwatch();
 
             // double[][] trainData = null;
             // double[][] testData = null;
             // MakeTrainTest(Iris.Dataset(), out trainData, out testData);
 
+            Console.WriteLine("Loading GLoVE vectors from {0}", glovePath);
             stopwatch.Start();
-            
-            const int numInput = 4;
-            const int numHidden = 7;
-            const int numOutput = 3;
-            var nn = new SparseNetwork(numInput, numHidden, numOutput);
-            // nn.InitializeWeights();
-            // Console.WriteLine(nn.ToString());
+            var reader = new WordVectorReader(glovePath);
+            stopwatch.Stop();
+            Console.WriteLine("Task finished in {0} ms", stopwatch.ElapsedMilliseconds);
 
-            var maxEpochs = 15;
+            stopwatch.Restart();
+            var vectorizer = new SentenceVectorizer(reader);
+            var loader = new DataLoader.IntentsLoader(dataPath, vectorizer);
+
+            var trainData = loader.GetData();
+            stopwatch.Stop();
+            Console.WriteLine("Task finished in {0} ms", stopwatch.ElapsedMilliseconds);
+
+            Console.WriteLine("Training started");
+            stopwatch.Restart();
+            
+            var numInput = loader.InputDimensions;
+            var numHidden = 50;
+            var numOutput = loader.OutputDimensions;
+
+            var nn = new SparseNetwork(numInput, numHidden, numOutput);
+
+            var maxEpochs = 50;
             double learnRate = 0.02;
 
-            var trainData = Iris.SparseDataset();
             nn.Train(trainData, maxEpochs, learnRate);
-
             var trainAcc = nn.Accuracy(trainData);
             Console.WriteLine("\nAccuracy on training data = " + trainAcc.ToString("F4"));
+
+            stopwatch.Stop();
+            Console.WriteLine("Task finished in {0} ms", stopwatch.ElapsedMilliseconds);
 
             // var testAcc = nn.Accuracy(testData);
             // Console.WriteLine("\nAccuracy on test data = " + testAcc.ToString("F4"));
@@ -53,31 +70,22 @@ namespace BotBotNLP
             // Console.WriteLine(test[5000000, 5000000]);
             // Console.WriteLine(test[10, 20]);
             
-            stopwatch.Stop();
-            Console.WriteLine("Task finished in {0} ms", stopwatch.ElapsedMilliseconds);
-
-            Console.WriteLine("Loading GLoVE vectors from {0}", glovePath);
-            stopwatch.Start();
-            var reader = new WordVectorReader(glovePath);
-            stopwatch.Stop();
-
-            var vectorizer = new SentenceVectorizer(reader);
-
             while (true) {
-                Console.Write("Word for inference: ");
+                Console.Write("Sentence for testing: ");
                 var sentence = Console.ReadLine();
 
                 if (sentence == "exit") break;
 
                 stopwatch.Restart();
-                var sent_vector = vectorizer.SentenceToVector(sentence, false);
+                var sent_vector = vectorizer.SentenceToVector(sentence);
+                var result = nn.ComputeOutputs(sent_vector);
+                var resultIdx = SparseNetwork.MaxIndex(result);
                 stopwatch.Stop();
 
-                Console.WriteLine("Result: {0}", String.Join(",", sent_vector.Values.Take(100)));
-                Console.WriteLine("Inference time: {0}", stopwatch.ElapsedMilliseconds);
+                Console.WriteLine($"Result: {loader.Intents[resultIdx].name}, Confidence: {result[resultIdx]}");
+                Console.WriteLine($"Inference time: {stopwatch.ElapsedMilliseconds}");
             }
         }
-
 
         static void MakeTrainTest(double[][] allData, out double[][] trainData, out double[][] testData)
         {

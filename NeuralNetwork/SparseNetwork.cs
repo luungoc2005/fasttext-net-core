@@ -235,10 +235,10 @@ namespace BotBotNLP.NeuralNetwork
     // }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private SparseVector<double> ComputeOutputs(SparseVector<double> xValues)
+    public SparseVector<double> ComputeOutputs(SparseVector<double> xValues)
     {
       if (xValues.Length != numInput)
-        throw new Exception("Bad xValues array length");
+        throw new Exception($"Bad xValues array length. Got {xValues.Length}, expected {numInput}");
 
       var hSums = new SparseVector<double>(numHidden); // hidden nodes sums scratch array
       var oSums = new SparseVector<double>(numOutput); // output nodes sums
@@ -333,14 +333,14 @@ namespace BotBotNLP.NeuralNetwork
         throw new Exception("target values not same Length as output in UpdateWeights");
 
       // 1. compute output gradients
-      for (int i = 0; i < tValues.Keys.Count; ++i)
+      for (int i = 0; i < tValues.Length; ++i)
       {
         // MSE version
         // derivative of softmax = (1 - y) * y (same as log-sigmoid)
         // var derivative = (1 - outputs[i]) * outputs[i];
         // oGrads[i] = derivative * (tValues[i] - outputs[i]);
         // cross entropy version
-        oGrads[tValues.Keys[i]] = (tValues.Values[i] - outputs[tValues.Keys[i]]);
+        oGrads[i] = (tValues[i] - outputs[i]);
       }
 
       // 2. compute hidden gradients
@@ -450,15 +450,19 @@ namespace BotBotNLP.NeuralNetwork
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Train(SparseMatrix<double> trainData, int maxEprochs, double learnRate)
+    public void Train(Tuple<SparseMatrix<double>, SparseMatrix<double>> trainData,
+      int maxEprochs,
+      double learnRate,
+      bool shuffle = true)
     {
       // train a back-prop style NN classifier using learning rate and momentum
       // no weight decay
       var epoch = 1;
-      var xValues = new SparseVector<double>(numInput); // inputs
-      var tValues = new SparseVector<double>(numOutput); // target values
 
-      var sequence = Enumerable.Range(0, trainData.Rows).ToArray();
+      var xValues = trainData.Item1; // inputs
+      var tValues = trainData.Item2; // target values
+
+      var sequence = Enumerable.Range(0, xValues.Rows).ToArray();
 
       var lossHistory = new List<double>();
 
@@ -469,23 +473,21 @@ namespace BotBotNLP.NeuralNetwork
         Console.WriteLine($"Iteration {epoch} - Loss {loss}");
 
         Shuffle(sequence); // visit each training data in random order
-        for (int i = 0; i < trainData.Rows; ++i)
+        for (int i = 0; i < xValues.Rows; ++i)
         {
           int idx = sequence[i];
-          SparseVector<double>.Copy(trainData[idx], xValues, numInput); // extract x's and y's.
-          SparseVector<double>.Copy(trainData[idx], numInput, tValues, 0, numOutput);
-          ComputeOutputs(xValues); // copy xValues in, compute outputs (and store them internally)
-          UpdateWeights(tValues, epoch, learnRate, epoch == 1); // use back-prop to find better weights
+          ComputeOutputs(xValues[idx]); // copy xValues in, compute outputs (and store them internally)
+          UpdateWeights(tValues[idx], epoch, learnRate, epoch == 1); // use back-prop to find better weights
         }
 
         // Check for early stopping
-        // if (lossHistory.Count > 3) { // For a minimum of 3 epochs
-        //   if (Math.Abs(lossHistory[epoch - 3] - lossHistory[epoch - 1]) < 0.001) // Loss increasing for 2 consecutive times
-        //   {
-        //     Console.WriteLine("Early stopping.");
-        //     break;
-        //   }
-        // }
+        if (lossHistory.Count > 3) { // For a minimum of 3 epochs
+          if (Math.Abs(lossHistory[epoch - 3] - lossHistory[epoch - 1]) < 0.001) // Loss increasing for 2 consecutive times
+          {
+            Console.WriteLine("Early stopping.");
+            break;
+          }
+        }
         ++epoch;
       }
     }
@@ -525,18 +527,17 @@ namespace BotBotNLP.NeuralNetwork
     //   return sumSquaredError / trainData.Length;
     // }
 
-    private double NLLLoss(SparseMatrix<double> trainData) // used as a training stopping condition
+    private double NLLLoss(Tuple<SparseMatrix<double>, SparseMatrix<double>> trainData) // used as a training stopping condition
     {
       // average squared error per training tuple
       var nllloss = 0.0;
-      var xValues = new SparseVector<double>(numInput); // first numInput values in trainData
-      var tValues = new SparseVector<double>(numOutput); // last numOutput values
+      var xValues = trainData.Item1; // first numInput values in trainData
 
-      for (var i = 0; i < trainData.Rows; ++i) 
+      for (var i = 0; i < xValues.Rows; ++i) 
       {
-        SparseVector<double>.Copy(trainData[i], xValues, numInput); // get xValues.
-        SparseVector<double>.Copy(trainData[i], numInput, tValues, 0, numOutput); // get target values
-        var yValues = this.ComputeOutputs(xValues); // compute output using current weights
+        var yValues = this.ComputeOutputs(xValues[i]); // compute output using current weights
+        var tValues = trainData.Item2[i];
+
         for (var j = 0; j < numOutput; ++j)
         {
           var err = -(tValues[j] * Math.Log(yValues[j] + 1e-8));
@@ -544,26 +545,24 @@ namespace BotBotNLP.NeuralNetwork
         }
       }
 
-      return nllloss / trainData.Rows;
+      return nllloss / xValues.Rows;
     }
 
-    public double Accuracy(SparseMatrix<double> testData)
+    public double Accuracy(Tuple<SparseMatrix<double>, SparseMatrix<double>> testData)
     {
       // percentage correct using winner-takes all
       var numCorrect = 0;
       var numWrong = 0;
-      var xValues = new SparseVector<double>(numInput); // inputs
-      var tValues = new SparseVector<double>(numOutput); // targets
+      var xValues = testData.Item1; // inputs
+      var tValues = testData.Item2; // targets
       SparseVector<double> yValues; // computed Y
 
-      for (var i = 0; i < testData.Rows; ++i)
+      for (var i = 0; i < xValues.Rows; ++i)
       {
-        SparseVector<double>.Copy(testData[i], xValues, numInput); // parse test data into x-values and t-values
-        SparseVector<double>.Copy(testData[i], numInput, tValues, 0, numOutput);
-        yValues = this.ComputeOutputs(xValues);
+        yValues = this.ComputeOutputs(xValues[i]);
         var maxIndex = MaxIndex(yValues); // which cell in yValues has largest value?
 
-        if (tValues[maxIndex] == 1.0) // ugly. consider AreEqual(double x, double y)
+        if (tValues[i][maxIndex] == 1.0) // ugly. consider AreEqual(double x, double y)
           ++numCorrect;
         else
           ++numWrong;
@@ -571,7 +570,7 @@ namespace BotBotNLP.NeuralNetwork
       return (numCorrect * 1.0) / (numCorrect + numWrong); // ugly 2 - check for divide by zero
     }
 
-    private static int MaxIndex(SparseVector<double> vector) // helper for Accuracy()
+    public static int MaxIndex(SparseVector<double> vector) // helper for Accuracy()
     {
       // index of largest value
       var bigIndex = 0;

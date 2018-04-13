@@ -11,9 +11,19 @@ using BotBotNLP.NeuralNetwork.Sparse;
 
 namespace BotBotNLP.Vectorizers
 {
-  class SentenceVectorizer {
+  public class SentenceVectorizer {
     public int HashingBins {get; private set;}
+
+    public bool UseHashingTrick {get; set;} = true;
     public IWordVectorReader WordVectorReader {get; set;}
+
+    public int SentenceEmbeddingDim {
+      get {
+        return this.UseHashingTrick
+          ? this.WordVectorReader.EmbeddingDim + this.HashingBins
+          : this.WordVectorReader.EmbeddingDim;
+      }
+    }
     
     public SentenceVectorizer(IWordVectorReader wordVectorReader, int hashingBins = 10000000) {
       this.WordVectorReader = wordVectorReader;
@@ -50,7 +60,7 @@ namespace BotBotNLP.Vectorizers
       return bigrams.ToArray();
     }
 
-    public SparseVector<double> SentenceToVector(string sentence, bool useHashingTrick = true) {
+    public SparseVector<double> SentenceToVector(string sentence) {
       var words = this.SentenceToWords(sentence.Trim().ToLowerInvariant());
       if (words.Length == 0) {
         return null;
@@ -71,25 +81,25 @@ namespace BotBotNLP.Vectorizers
           }
         }
         
-        if (!useHashingTrick) {
+        if (!this.UseHashingTrick) {
           var result = new SparseVector<double>(this.WordVectorReader.EmbeddingDim);
           SparseVector<double>.Copy(wordvec_embeds, result);
           return result;
         }
         else {
           var wordvec_dim = this.WordVectorReader.EmbeddingDim;
-          var embeddingDim =  wordvec_dim + this.HashingBins;
+          var embeddingDim =  this.SentenceEmbeddingDim;
           
           var embeds = new SparseVector<double>(embeddingDim);
           SparseVector<double>.Copy(wordvec_embeds, embeds, this.WordVectorReader.EmbeddingDim);
 
           if (words.Length > 2) {
             var bigrams = this.GetBiGramList(words);
-            Parallel.ForEach(bigrams, bigram => {
+            foreach (var bigram in bigrams) {
               var hash = this.CalculateHash(bigram);
               var hash_loc = hash % ((UInt64)this.HashingBins - 1) + 1;
               embeds[(int)((UInt64)wordvec_dim + hash_loc)] = 1;
-            });
+            }
           }
 
           return embeds;
